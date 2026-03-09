@@ -1,0 +1,74 @@
+.pulse {
+  animation: pulseColor 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseColor {
+  0%, 100% {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  50% {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2rem;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-image {
+  width: 100%;
+  aspect-ratio: 2/3;
+  border-radius: 12px;
+}
+
+.skeleton-text {
+  height: 1rem;
+  border-radius: 4px;
+}
+
+.skeleton-details {
+  position: relative;
+  min-height: 100vh;
+}
+
+.skeleton-backdrop {
+  width: 100%;
+  height: 60vh;
+  position: absolute;
+  top: 0;
+  z-index: 0;
+}
+
+.skeleton-content {
+  position: relative;
+  z-index: 1;
+  padding-top: 30vh;
+  display: flex;
+  gap: 3rem;
+}
+
+.skeleton-poster {
+  width: 300px;
+  height: 450px;
+  border-radius: 16px;
+  flex-shrink: 0;
+}
+
+.skeleton-info {
+  flex: 1;
+  padding-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .skeleton-content {
+    flex-direction: column;
+    align-items: center;
+  }
+}

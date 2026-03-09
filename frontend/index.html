@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineVerse — Enter the Universe of Cinema</title>
+  <meta name="description" content="CineVerse — A premium cinematic movie discovery platform. Explore a universe of films." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* ── Vignette overlay ── */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 40%,
+        rgba(0,0,0,0.55) 75%,
+        rgba(0,0,0,0.92) 100%
+      );
+    }
+
+    /* ── Cinematic letter-box bars ── */
+    .letterbox-top,
+    .letterbox-bottom {
+      position: fixed;
+      left: 0; right: 0;
+      height: 60px;
+      z-index: 3;
+      pointer-events: none;
+      transition: height 1s ease;
+    }
+    .letterbox-top    { top: 0;    background: #000; }
+    .letterbox-bottom { bottom: 0; background: #000; }
+
+    /* ── Brand reveal ── */
+    #brand {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .brand-logo {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(3rem, 10vw, 9rem);
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg,
+        #ffffff 0%,
+        #e5d4ff 25%,
+        #9edbff 50%,
+        #e5d4ff 75%,
+        #ffffff 100%
+      );
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      background-size: 200% auto;
+      animation: shimmer 5s linear infinite;
+      filter: drop-shadow(0 0 30px rgba(124, 92, 255, 0.5));
+      transform: scale(0.92) translateZ(0);
+      transition: transform 3s cubic-bezier(0.16,1,0.3,1);
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 0% center; }
+      100% { background-position: 200% center; }
+    }
+
+    .brand-tagline {
+      margin-top: 1.5rem;
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(0.7rem, 1.5vw, 0.95rem);
+      font-weight: 300;
+      letter-spacing: 0.6em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.6);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 2s ease 0.8s, transform 2s ease 0.8s;
+    }
+
+    #brand.visible .brand-logo  { transform: scale(1); }
+    #brand.visible .brand-tagline { opacity: 1; transform: translateY(0); }
+
+    /* ── Loading screen ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      transition: opacity 1s ease;
+    }
+
+    #loading .load-logo {
+      font-family: 'Cinzel', serif;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      color: rgba(180,150,255,0.8);
+    }
+
+    .load-bar-wrap {
+      width: 180px;
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .load-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #7c5cff, #5ec8ff);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    /* ── Scanline texture ── */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.04) 2px,
+        rgba(0,0,0,0.04) 4px
+      );
+    }
+
+    /* ── Particle canvas ── */
+    #particle-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── Film grain ── */
+    @keyframes grain {
+      0%,100% { transform: translate(0,0); }
+      10%      { transform: translate(-2%,-3%); }
+      20%      { transform: translate(3%,1%); }
+      30%      { transform: translate(-1%,4%); }
+      40%      { transform: translate(4%,-1%); }
+      50%      { transform: translate(-3%,3%); }
+      60%      { transform: translate(1%,-4%); }
+      70%      { transform: translate(-4%,0%); }
+      80%      { transform: translate(2%,4%); }
+      90%      { transform: translate(-2%,-2%); }
+    }
+    .grain {
+      position: fixed;
+      inset: -50%;
+      width: 200%; height: 200%;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0.028;
+      animation: grain 0.12s steps(1) infinite;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    }
+
+    /* ── Progress indicator ── */
+    #progress-ring {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    #progress-ring svg { transform: rotate(-90deg); }
+    #progress-ring circle.track { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 1.5; }
+    #progress-ring circle.fill  { fill: none; stroke: rgba(180,140,255,0.6); stroke-width: 1.5; stroke-linecap: round; transition: stroke-dashoffset 0.2s linear; }
+
+    /* ── Lens‑flare overlay ── */
+    #lens-flare {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      background: radial-gradient(ellipse 60% 40% at 30% 50%,
+        rgba(180,140,255,0.18) 0%,
+        rgba(100,200,255,0.08) 40%,
+        transparent 70%
+      );
+    }
+
+    /* ── React Root ── */
+    #root {
+      position: relative;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.5s ease;
+      height: 100%;
+      width: 100%;
+      overflow: auto;
+    }
+
+    #root.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #enter-button {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      padding: 1rem 2.5rem;
+      background: linear-gradient(135deg, #7c5cff, #5ec8ff);
+      color: white;
+      border: none;
+      border-radius: 30px;
+      font-family: 'Cinzel', serif;
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s ease, transform 0.3s ease;
+      box-shadow: 0 0 30px rgba(124, 92, 255, 0.4);
+    }
+
+    #enter-button.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #enter-button:hover {
+      transform: translateX(-50%) scale(1.05);
+      box-shadow: 0 0 50px rgba(124, 92, 255, 0.6);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading screen (Initial Preloader for Splash Assets) -->
+<div id="loading">
+  <div class="load-logo">CINEVERSE</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
+</div>
+
+<!-- Main canvas -->
+<div id="canvas-container"></div>
+
+<!-- FX overlays -->
+<canvas id="particle-canvas"></canvas>
+<div class="vignette"></div>
+<div class="scanlines"></div>
+<div class="grain"></div>
+<div id="lens-flare"></div>
+
+<!-- Letter-box -->
+<div class="letterbox-top"></div>
+<div class="letterbox-bottom"></div>
+
+<!-- Progress ring -->
+<div id="progress-ring">
+  <svg width="40" height="40" viewBox="0 0 40 40">
+    <circle class="track" cx="20" cy="20" r="17"/>
+    <circle class="fill"  cx="20" cy="20" r="17"
+      id="ring-fill"
+      stroke-dasharray="106.8"
+      stroke-dashoffset="106.8"/>
+  </svg>
+</div>
+
+<!-- Brand reveal -->
+<div id="brand">
+  <div class="brand-logo">CineVerse</div>
+  <div class="brand-tagline">Enter the universe of cinema</div>
+</div>
+
+<button id="enter-button">ENTER GALAXY</button>
+<button id="skip-intro" style="position: fixed; top: 30px; right: 30px; z-index: 110; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.4); padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; letter-spacing: 0.2em; cursor: pointer; font-family: 'Inter', sans-serif;">SKIP INTRO</button>
+
+<!-- React Root -->
+<div id="root"></div>
+
+<!-- Three.js & Post-processing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+<script>
+/* ── Constants & tunables ─────────────────────────────── */
+const DURATION      = 8.5;       // 8.5s for more cinematic breath
+const BRAND_AT      = 3.5;       // Brand reveal
+const BRAND_FADE_IN = 2.0;       // Gradual reveal
+
+const POSTER_DATA = [
+  { file: '/poster_scifi.png',    hue: 0x7c5cff },
+  { file: '/poster_noir.png',     hue: 0xffa040 },
+  { file: '/poster_fantasy.png',  hue: 0x40ffaa },
+  { file: '/poster_horror.png',   hue: 0xff3060 },
+  { file: '/poster_action.png',   hue: 0x40b8ff },
+  { file: '/poster_romance.png',  hue: 0xff80c0 },
+];
+
+/* ── Global state ─────────────────────────────────────── */
+let renderer, scene, camera, composer;
+let clock = new THREE.Clock();
+let elapsedOverride = 0;
+let running = false;
+let animId;
+let isFinished = false;
+
+const posters  = [];
+const reels    = [];
+const screens  = [];
+const particles= [];
+let   starField;
+
+const manager = new THREE.LoadingManager();
+const loadBar = document.getElementById('load-bar');
+
+manager.onProgress = (_,loaded,total) => {
+  loadBar.style.width = (loaded/total*100) + '%';
+};
+manager.onLoad = () => {
+  loadBar.style.width = '100%';
+  setTimeout(() => {
+    const loading = document.getElementById('loading');
+    loading.style.opacity = '0';
+    setTimeout(() => {
+      loading.style.display = 'none';
+      running = true;
+      document.getElementById('progress-ring').style.opacity = '1';
+      animate();
+    }, 1000);
+  }, 400);
+};
+
+const tl = new THREE.TextureLoader(manager);
+
+function initRenderer() {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000005, 1);
+  renderer.shadowMap.enabled = true;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  scene  = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x020008, 0.025);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 500);
+  camera.position.set(0, 0, 40);
+
+  // Post Processing
+  const renderScene = new THREE.RenderPass(scene, camera);
+  const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+  bloomPass.threshold = 0.22;
+  bloomPass.strength = 1.2;
+  bloomPass.radius = 0.55;
+
+  composer = new THREE.EffectComposer(renderer);
+  composer.addPass(renderScene);
+  composer.addPass(bloomPass);
+}
+
+function buildStarField() {
+  const N = 8000;
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  const sz  = new Float32Array(N);
+
+  const palette = [[1.0, 0.9, 1.0], [0.7, 0.85, 1.0], [1.0, 0.95, 0.7], [0.85, 0.7, 1.0]];
+
+  for (let i = 0; i < N; i++) {
+    const r = 150 + Math.random() * 200;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+    pos[i*3]   = r * Math.sin(ph) * Math.cos(th);
+    pos[i*3+1] = r * Math.sin(ph) * Math.sin(th);
+    pos[i*3+2] = r * Math.cos(ph);
+    const c = palette[Math.floor(Math.random() * palette.length)];
+    const b = 0.6 + Math.random() * 0.4;
+    col[i*3]   = c[0] * b;
+    col[i*3+1] = c[1] * b;
+    col[i*3+2] = c[2] * b;
+    sz[i] = 0.5 + Math.random() * 2.5;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('size',     new THREE.BufferAttribute(sz,  1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: `
+      attribute float size;
+      attribute vec3 color;
+      varying vec3 vColor;
+      uniform float time;
+      void main(){
+        vColor = color;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float twinkle = 0.85 + 0.15 * sin(time * 2.5 + position.x * 0.1 + position.y * 0.07);
+        gl_PointSize = size * twinkle * (300.0 / -mv.z);
+        gl_Position  = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec3 vColor;
+      void main(){
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = 1.0 - smoothstep(0.4, 1.0, d);
+        if(a < 0.01) discard;
+        gl_FragColor = vec4(vColor, a);
+      }`,
+    transparent: true,
+    vertexColors: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  starField = new THREE.Points(geo, mat);
+  scene.add(starField);
+}
+
+function buildNebula() {
+  const nebulaColors = [0x3b0f6e, 0x0a2060, 0x051a2a, 0x1a0530, 0x060d20, 0x110033, 0x000022];
+  for (let i = 0; i < 12; i++) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    const cx = 256, cy = 256;
+    const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 256);
+    const c = new THREE.Color(nebulaColors[i % nebulaColors.length]);
+    grad.addColorStop(0, `rgba(${~~(c.r*255)},${~~(c.g*255)},${~~(c.b*255)},0.8)`);
+    grad.addColorStop(1, `rgba(0,0,0,0)`);
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 512);
+    const tex = new THREE.CanvasTexture(canvas);
+    const geo = new THREE.PlaneGeometry(250 + Math.random()*350, 250 + Math.random()*350);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0.08 + Math.random()*0.08,
+      depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set((Math.random()-0.5)*250, (Math.random()-0.5)*150, -120 - Math.random()*150);
+    mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    scene.add(mesh);
+  }
+}
+
+function buildPoster(data, index) {
+  const tex = tl.load(data.file);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const geo  = new THREE.PlaneGeometry(6, 9);
+  const mat  = new THREE.MeshStandardMaterial({
+    map: tex, roughness: 0.25, metalness: 0.15,
+    emissive: new THREE.Color(data.hue), emissiveIntensity: 0.06,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  const frameGeo = new THREE.PlaneGeometry(6.3, 9.3);
+  const frameMat = new THREE.MeshBasicMaterial({
+    color: data.hue, transparent: true, opacity: 0.0,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const frame = new THREE.Mesh(frameGeo, frameMat);
+  frame.position.z = -0.05;
+  const group = new THREE.Group();
+  group.add(mesh); group.add(frame);
+  const angle  = (index / POSTER_DATA.length) * Math.PI * 2 + Math.random() * 0.8;
+  const radius = 18 + Math.random() * 24;
+  const height = (Math.random() - 0.5) * 22;
+  group.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius - 10);
+  group.lookAt(new THREE.Vector3(0, height * 0.3, 40));
+  group.rotation.x += (Math.random() - 0.5) * 0.5;
+  group.rotation.y += (Math.random() - 0.5) * 0.5;
+  group.userData = {
+    baseAngle: angle, radius: radius, height: height,
+    orbitSpeed: 0.012 + Math.random() * 0.008,
+    floatAmp: 0.8 + Math.random() * 0.6,
+    floatFreq: 0.3 + Math.random() * 0.4,
+    floatOffset: Math.random() * Math.PI * 2,
+    spinSpeed: (Math.random() - 0.5) * 0.002,
+    glowPhase: Math.random() * Math.PI * 2,
+    frame: frame, hue: data.hue,
+  };
+  scene.add(group);
+  posters.push(group);
+  const light = new THREE.PointLight(data.hue, 0.8, 20);
+  light.position.copy(group.position);
+  scene.add(light);
+  group.userData.light = light;
+}
+
+function buildReel(index) {
+  const outerR = 2.8, innerR = 0.4, thick = 0.35, spokes = 8;
+  const group = new THREE.Group();
+  const ringGeo = new THREE.TorusGeometry(outerR, 0.18, 16, 64);
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a2e, metalness: 0.95, roughness: 0.15,
+    emissive: 0x3333aa, emissiveIntensity: 0.08,
+  });
+  group.add(new THREE.Mesh(ringGeo, ringMat));
+  const hubGeo = new THREE.CylinderGeometry(innerR, innerR, thick, 32);
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0x222244, metalness: 0.9, roughness: 0.2 });
+  const hub = new THREE.Mesh(hubGeo, hubMat);
+  hub.rotation.x = Math.PI / 2;
+  group.add(hub);
+  for (let s = 0; s < spokes; s++) {
+    const a = (s / spokes) * Math.PI * 2;
+    const spokeGeo = new THREE.CylinderGeometry(0.06, 0.06, outerR - innerR, 8);
+    const spk = new THREE.Mesh(spokeGeo, hubMat.clone());
+    spk.rotation.z = Math.PI / 2; spk.rotation.x = Math.PI / 2;
+    spk.position.set(Math.cos(a) * (outerR * 0.5), Math.sin(a) * (outerR * 0.5), 0);
+    spk.rotation.z = a + Math.PI / 2;
+    group.add(spk);
+  }
+  const angle  = (index / 4) * Math.PI * 2 + 0.3;
+  const radius = 30 + Math.random() * 15;
+  const height = (Math.random() - 0.5) * 30;
+  group.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius - 5);
+  group.userData = {
+    baseAngle: angle, radius: radius, height: height, orbitSpeed: 0.008 + Math.random() * 0.006,
+    spinAxis: new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize(),
+    spinSpeed: 0.005 + Math.random() * 0.008,
+  };
+  scene.add(group); reels.push(group);
+}
+
+function buildScreen(index) {
+  const W = 10, H = 6;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 300;
+  const ctx = canvas.getContext('2d');
+  const schemes = [['#0d001a','#6600ff','#ff00cc'], ['#000d1a','#0066ff','#00ccff'], ['#1a0000','#ff2200','#ff8800']];
+  const sc = schemes[index % schemes.length];
+  function drawScreenContent(t) {
+    ctx.fillStyle = sc[0]; ctx.fillRect(0, 0, 512, 300);
+    const y = ((t * 60) % 360) - 30;
+    const g = ctx.createLinearGradient(0, y, 0, y + 60);
+    g.addColorStop(0, sc[1] + '00'); g.addColorStop(0.5, sc[1] + '33'); g.addColorStop(1, sc[1] + '00');
+    ctx.fillStyle = g; ctx.fillRect(0, y, 512, 60);
+    ctx.strokeStyle = sc[2] + 'cc'; ctx.lineWidth = 3;
+    ctx.strokeRect(10, 10, 492, 280);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(W, H);
+  const mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color(sc[1]), emissiveIntensity: 0.5 });
+  const mesh = new THREE.Mesh(geo, mat);
+  const group = new THREE.Group(); group.add(mesh);
+  const angle  = (index / 4) * Math.PI * 2 + 1.1;
+  const radius = 22 + Math.random() * 18;
+  const height = (Math.random() - 0.5) * 20;
+  group.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius - 15);
+  group.lookAt(new THREE.Vector3(0, height * 0.5, 40));
+  group.userData = {
+    baseAngle: angle, radius: radius, height: height, orbitSpeed: 0.01 + Math.random() * 0.007,
+    floatAmp: 0.5 + Math.random() * 0.5, floatFreq: 0.25 + Math.random() * 0.35,
+    floatOffset: Math.random() * Math.PI * 2, spinSpeed: (Math.random() - 0.5) * 0.002,
+    canvas, ctx, tex, drawFn: drawScreenContent, sc, updateEvery: 3, lastUpdate: 0,
+  };
+  scene.add(group); screens.push(group);
+}
+
+function buildParticles() {
+  const N = 400; const pPos = new Float32Array(N * 3); const pCol = new Float32Array(N * 3); const pSz = new Float32Array(N);
+  const colors = [0x7c5cff, 0x5ec8ff, 0xff5090];
+  for (let i = 0; i < N; i++) {
+    const r = 5 + Math.random() * 60; const th = Math.random() * Math.PI * 2; const ph = Math.acos(2*Math.random()-1);
+    pPos[i*3] = r * Math.sin(ph) * Math.cos(th); pPos[i*3+1] = r * Math.sin(ph) * Math.sin(th); pPos[i*3+2] = r * Math.cos(ph) - 10;
+    const c = new THREE.Color(colors[Math.floor(Math.random()*colors.length)]); pCol[i*3] = c.r; pCol[i*3+1] = c.g; pCol[i*3+2] = c.b;
+    pSz[i] = 1 + Math.random() * 4;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(pCol, 3));
+  geo.setAttribute('size',     new THREE.BufferAttribute(pSz,  1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: `attribute float size; attribute vec3 color; varying vec3 vColor; varying float vAlpha; uniform float time; void main(){ vColor = color; float pulse = 0.7 + 0.3 * sin(time * 1.2 + position.x); vAlpha = pulse; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = size * pulse * (250.0 / -mv.z); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying vec3 vColor; varying float vAlpha; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.0,1.0,d)) * vAlpha * 0.7; if(a < 0.01) discard; gl_FragColor = vec4(vColor, a); }`,
+    transparent: true, vertexColors: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const pts = new THREE.Points(geo, mat); scene.add(pts); particles.push(pts);
+}
+
+function buildLights() {
+  scene.add(new THREE.AmbientLight(0x0a0520, 1.2));
+  const key = new THREE.DirectionalLight(0x6644cc, 0.6); key.position.set(20, 30, 20); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x224488, 0.3); fill.position.set(-20, -10, 10); scene.add(fill);
+}
+
+const camPath = new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,40), new THREE.Vector3(-15,5,20), new THREE.Vector3(15,-5,-20), new THREE.Vector3(0,0,40)], true);
+const lookPath = new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,-20), new THREE.Vector3(-10,0,-40), new THREE.Vector3(10,5,-40), new THREE.Vector3(0,0,-20)], true);
+
+function showBrand(t) {
+  const brandEl = document.getElementById('brand');
+  const lf = document.getElementById('lens-flare');
+  const btn = document.getElementById('enter-button');
+  const progress = Math.min((t - BRAND_AT) / BRAND_FADE_IN, 1);
+  if (progress > 0) {
+    brandEl.style.opacity = progress.toFixed(3);
+    brandEl.classList.add('visible');
+    lf.style.opacity = (progress * 0.9).toFixed(3);
+    if (progress >= 1) btn.classList.add('visible');
+  }
+}
+
+function updateRing(t) {
+  const fill = document.getElementById('ring-fill');
+  const circ = 106.8; const pct = Math.min(t / DURATION, 1);
+  fill.setAttribute('stroke-dashoffset', (circ * (1 - pct)).toFixed(2));
+}
+
+function animate() {
+  if (isFinished) return;
+  animId = requestAnimationFrame(animate);
+  if(!running) return;
+  const delta = clock.getDelta();
+  elapsedOverride = Math.min(elapsedOverride + delta, DURATION);
+  const t = elapsedOverride; const T = t / DURATION;
+  const pathT = (T * 0.95) % 1; const camPos = camPath.getPoint(pathT);
+  camera.position.lerp(camPos, 0.085); camera.lookAt(lookPath.getPoint(pathT));
+  starField.material.uniforms.time.value = t; starField.rotation.y += 0.0004;
+  particles.forEach(p => { p.material.uniforms.time.value = t; p.rotation.y += 0.0008; });
+  posters.forEach((g, i) => {
+    const d = g.userData; const a = d.baseAngle + t * d.orbitSpeed;
+    g.position.x = Math.cos(a) * d.radius; g.position.z = Math.sin(a) * d.radius - 10;
+    g.position.y = d.height + Math.sin(t * d.floatFreq + d.floatOffset) * d.floatAmp; g.rotation.y += d.spinSpeed;
+  });
+  reels.forEach(g => { const d = g.userData; const a = d.baseAngle + t * d.orbitSpeed; g.position.x = Math.cos(a) * d.radius; g.position.z = Math.sin(a) * d.radius - 5; g.rotateOnAxis(d.spinAxis, d.spinSpeed); });
+  screens.forEach((g, i) => { const d = g.userData; const a = d.baseAngle + t * d.orbitSpeed; g.position.x = Math.cos(a) * d.radius; g.position.z = Math.sin(a) * d.radius - 15; if (Math.floor(t * 60) % d.updateEvery === 0) { d.drawFn(t); d.tex.needsUpdate = true; } });
+  if(t >= BRAND_AT) showBrand(t);
+  updateRing(t);
+  
+  // Subtle camera shake
+  const shake = 0.05 * Math.sin(t * 15);
+  camera.position.y += shake * 0.1;
+  camera.rotation.z += shake * 0.001;
+
+  composer.render();
+}
+
+function startCineverse() {
+  isFinished = true;
+  cancelAnimationFrame(animId);
+  document.getElementById('brand').style.opacity = '0';
+  document.getElementById('enter-button').style.opacity = '0';
+  document.getElementById('skip-intro').style.opacity = '0';
+  document.getElementById('canvas-container').style.opacity = '0';
+  document.getElementById('canvas-container').style.transition = 'opacity 1.5s ease';
+  document.getElementById('progress-ring').style.opacity = '0';
+  document.querySelector('.letterbox-top').style.height = '0';
+  document.querySelector('.letterbox-bottom').style.height = '0';
+  setTimeout(() => {
+    document.getElementById('canvas-container').style.display = 'none';
+    document.getElementById('root').classList.add('visible');
+    // Allow scrolling again
+    document.body.style.overflow = 'auto';
+  }, 1500);
+}
+
+document.getElementById('enter-button').addEventListener('click', startCineverse);
+document.getElementById('skip-intro').addEventListener('click', startCineverse);
+
+function init() {
+  initRenderer(); buildStarField(); buildNebula(); buildLights(); buildParticles();
+  POSTER_DATA.forEach((d, i) => buildPoster(d, i));
+  for(let i = 0; i < 4; i++) buildReel(i);
+  for(let i = 0; i < 4; i++) buildScreen(i);
+}
+init();
+window.addEventListener('resize', () => { 
+  camera.aspect = window.innerWidth / window.innerHeight; 
+  camera.updateProjectionMatrix(); 
+  renderer.setSize(window.innerWidth, window.innerHeight); 
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
